@@ -1,28 +1,24 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-"""
-Spyder Editor
 
-This is a temporary script file.
-"""
 
-import speech_recognition as sr
-from time import ctime
-import time
-import os
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+from configparser import ConfigParser
 from gtts import gTTS
+from time import ctime
+import speech_recognition as sr
 import requests, json
-#Imports for G-Calendar
 import datetime
 import pickle
 import os.path
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 import webbrowser
 import random
 import wikipedia
-from configparser import ConfigParser
+import time
+import os
+
 
 #Read config.ini file
 config_object = ConfigParser()
@@ -45,7 +41,7 @@ def listen():
     global listening
 
     r = sr.Recognizer()
-         
+
     with sr.Microphone() as source:
         print("I am listening..." + "\n")
         audio = r.listen(source)
@@ -59,7 +55,7 @@ def listen():
             print("Google Speech Recognition did not understand audio" + "\n")
             times += 1
         else:
-            data = "stop listening"            
+            data = "stop listening"
     except sr.RequestError as e:
         print("Request Failed; {0}".format(e))
     return data
@@ -70,7 +66,7 @@ def respond(audioString):
     tts = gTTS(text=audioString, lang='en')
     tts.save("speech.mp3")
     os.system("mpg321 -q speech.mp3")
-    
+    time.sleep(2)
 
 
 def calendar():
@@ -100,7 +96,7 @@ def calendar():
 
     # Call the Calendar API
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-   
+
     print('Getting the upcoming 5 events...')
     events_result = service.events().list(calendarId='primary', timeMin=now,
                                         maxResults=5, singleEvents=True,
@@ -112,10 +108,10 @@ def calendar():
     for event in events:
         start = event['start'].get('dateTime', event['start'].get('date'))
         print(start, event['summary'])
- 
-        
+
+
 def weather(data):
-    listening = True  
+    listening = True
     data = data.split(" ")
     location = str(data[5])
     units = "metric"
@@ -133,29 +129,29 @@ def weather(data):
             + str(temp) + "°C. But it really feels like " + str(temp_feels) \
             + "°C. Minimum is " + str(temp_min) + " and Maximum is " + str(temp_max) \
             + "°C. The weather description is: " + str(desc)
-        respond(resp_string)    
+        respond(resp_string)
     else:
         respond("City not found")
 
-  
+
 def maps(data):
     listening = True
     data = data.split(" ")
     location_url = "https://www.google.com/maps/place/" + str(data[2]) + "," \
         + str(data[3])
     respond("Hold on Stoyan, I will show you where " + data[2] + "," +  data[3] + " is.")
-    webbrowser.open(location_url)    
+    webbrowser.open(location_url)
 
 
-def sites(s):   
+def sites(s):
     listening=True
     respond("Redirecting to " + s.upper() + "\n")
     if s == "golem":
         webbrowser.open("https://www." + s + ".de", new=2)
     else:
         webbrowser.open("https://www." + s + ".com", new=2)
-        
-        
+
+
 def search(data):
     listening = True
     data = data.split(" ")
@@ -164,12 +160,12 @@ def search(data):
     for word in words:
         sentence += word
         sentence += "+"
-            
+
     location_url = "https://www.google.com/search?q=" + sentence
     respond("Let me Google that for you..." + "\n")
     webbrowser.open(location_url, new=2)
 
-    
+
 def open(data):
     listening = True
     data = data.split(" ")
@@ -191,96 +187,85 @@ def choices():
 
 
 def chuck_norris_joke():
-    listening = True    
+    listening = True
     json = requests.get(apis["chuck_api"]).json()
     print("Here is a joke.." + "\n")
     respond(json["value"])
 
 
 def random_number_facts():
-    listening = True    
+    listening = True
     js = requests.get(apis["trivia_api"])
     js2 = requests.get(apis["date_api"])
     respond(js.content.decode('utf-8'))
     print("\n")
     respond(js2.content.decode('utf-8'))
-   
+
 
 def random_advice():
-    listening = True   
+    listening = True
     js = requests.get(apis["advice_api"]).json()
     print("Here is an advice.." + "\n")
     respond(js["slip"]["advice"])
 
 
-# A function to check for wake word(s)
-def wakeWord(data):
-    WAKE_WORDS = ['hey computer', 'okay computer'] 
-    data = data.lower()  # Convert the text to all lower case words
-  # Check to see if the users command/text contains a wake word    
-    for phrase in WAKE_WORDS:
-        if phrase in data:
-            return True
-  # If the wake word was not found return false
-    return False
-
 
 # Function to get a person first and last name
 def get_person(data):
-    
-    wordList = data.split(" ") # Split the text into a list of words     
+
+    wordList = data.split(" ") # Split the text into a list of words
     for i in range(0, len(wordList)):
       if i + 3 <= len(wordList) - 1 and wordList[i].lower() == 'who' and wordList[i + 1].lower() == 'is':
-              
+
                person = wordList[i + 2] + ' ' + wordList[i + 3]
-    
+
     wiki = wikipedia.summary(person, sentences=2)
     respond(wiki)
-           
+
 
 
 def digital_assistant(data):
-    
+
     global listening
-    
+
     if "who is" in data:
         listening = True
         get_person(data)
-        
-    
+
+
     if "how are you" in data:
         listening = True
-        respond("I am well")        
-        
+        respond("I am well")
+
     if "what time is it" in data:
         listening = True
-        respond(ctime())    
-    
+        respond(ctime())
+
     if "where is" in data:
         maps(data)
-      
+
     if "what is the weather in" in data:
         weather(data)
 
     if "search" in data:
-        search(data)    
-      
+        search(data)
+
     if "calendar" in data:
-        calendar()    
-        
+        calendar()
+
     if "who is the boss" in data:
         listening = True
         site_url = "https://www.facebook.com/radoslavdimitrov34/"
         webbrowser.open(site_url, new=2)
         respond("This is my daddy.")
-            
-    if "open" in data:    
+
+    if "open" in data:
         open(data)
-                      
+
     if "sites" in data:
         choices()
-      
-    
+
+
     if "Reddit" in data:
         sites("reddit")
     elif "BBC" in data:
@@ -289,27 +274,29 @@ def digital_assistant(data):
         sites("golem")
     elif "polygon" in data:
         sites("polygon")
-    
-    
-    if "Chuck Norris" in data:        
+
+
+    if "Chuck Norris" in data:
         chuck_norris_joke()
-    
-    if "numbers" in data:        
+
+    if "numbers" in data:
         random_number_facts()
-        
-    if "advice" in data:      
+
+    if "advice" in data:
         random_advice()
-        
-    if "stop listening" in data:
+
+    if "who made you" in data or "who created you" in data:
+        listening = True
+        respond("I was built by Stoyan.")
+
+
+    if "stop listening" in data or "thank you" in data:
         listening = False
         print("Listening stopped")
+        respond("Bye")
         return listening
-    elif "thank you" in data:
-        listening = False
-        print("Listening stopped")
-        return listening
-    
-    
+
+
     return listening
 
 
@@ -317,14 +304,15 @@ def digital_assistant(data):
 def main():
     global listening
     global times
-      
+    for key in apis:
+        print(key)
     time.sleep(2)
     respond(random.choice(GREETING_RESPONSES) + " , " + random.choice(GREETING_NAMES) + "?")
-    
-    while listening == True:  
+
+    while listening == True:
         data = listen()
         listening = digital_assistant(data)
-        
-        
+
+
 if __name__ == '__main__':
     main()
