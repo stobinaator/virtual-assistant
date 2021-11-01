@@ -1,15 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from configparser import ConfigParser
-from gtts import gTTS
-from time import ctime
-import speech_recognition as sr
-import requests, json
+import requests
+import json
 import datetime
 import pickle
 import os.path
@@ -19,6 +12,13 @@ import wikipedia
 import time
 import os
 
+from time import ctime
+from configparser import ConfigParser
+import speech_recognition as sr
+from gtts import gTTS
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
 #Read config.ini file
 config_object = ConfigParser()
@@ -30,8 +30,10 @@ scopes = config_object["SCOPES"]
 keys = config_object["KEYS"]
 
 
-GREETING_NAMES = ['Stoyan', 'Stobko', 'Stebi', 'Merch', 'Boy', 'Stobs']
-GREETING_RESPONSES = ['howdy', 'whats good', 'hello', 'hey there']
+with open('greetings.json') as greet_f:
+    data = json.load(greet_f)
+    GREETING_RESPONSES = data['greeting responses']
+    GREETING_NAMES = data['greeting names']
 
 times = 0
 listening = True
@@ -77,37 +79,40 @@ def calendar():
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', scopes["google_calendar"])
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+    try:
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+        # If there are no (valid) credentials available, let the user log in.
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'config.ini', scopes["google_calendar"])
+                creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
 
-    service = build('calendar', 'v3', credentials=creds)
+        service = build('calendar', 'v3', credentials=creds)
 
-    # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+        # Call the Calendar API
+        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
 
-    print('Getting the upcoming 5 events...')
-    events_result = service.events().list(calendarId='primary', timeMin=now,
-                                        maxResults=5, singleEvents=True,
-                                        orderBy='startTime').execute()
-    events = events_result.get('items', [])
+        print('Getting the upcoming 5 events...')
+        events_result = service.events().list(calendarId='primary', timeMin=now,
+                                            maxResults=5, singleEvents=True,
+                                            orderBy='startTime').execute()
+        events = events_result.get('items', [])
 
-    if not events:
-        print('No upcoming events found.')
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
+        if not events:
+            print('No upcoming events found.')
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            print(start, event['summary'])
+    except json.decoder.JSONDecodeError:
+        print("whoops..something went wrong.")
 
 
 def weather(data):
@@ -212,16 +217,17 @@ def random_advice():
 
 # Function to get a person first and last name
 def get_person(data):
+    try:
+        wordList = data.split(" ") # Split the text into a list of words
+        for i in range(0, len(wordList)):
+          if i + 3 <= len(wordList) - 1 and wordList[i].lower() == 'who' and wordList[i + 1].lower() == 'is':
 
-    wordList = data.split(" ") # Split the text into a list of words
-    for i in range(0, len(wordList)):
-      if i + 3 <= len(wordList) - 1 and wordList[i].lower() == 'who' and wordList[i + 1].lower() == 'is':
+                  person = wordList[i + 2] + ' ' + wordList[i + 3]
 
-               person = wordList[i + 2] + ' ' + wordList[i + 3]
-
-    wiki = wikipedia.summary(person, sentences=2)
-    respond(wiki)
-
+          wiki = wikipedia.summary(person, sentences=2)
+          respond(wiki)
+    except wikipedia.exceptions.PageError:
+        print("wooops. didn't get that. can you repeat?")
 
 
 def digital_assistant(data):
@@ -231,7 +237,6 @@ def digital_assistant(data):
     if "who is" in data:
         listening = True
         get_person(data)
-
 
     if "how are you" in data:
         listening = True
@@ -253,18 +258,11 @@ def digital_assistant(data):
     if "calendar" in data:
         calendar()
 
-    if "who is the boss" in data:
-        listening = True
-        site_url = "https://www.facebook.com/radoslavdimitrov34/"
-        webbrowser.open(site_url, new=2)
-        respond("This is my daddy.")
-
     if "open" in data:
         open(data)
 
     if "sites" in data:
         choices()
-
 
     if "Reddit" in data:
         sites("reddit")
@@ -274,7 +272,6 @@ def digital_assistant(data):
         sites("golem")
     elif "polygon" in data:
         sites("polygon")
-
 
     if "Chuck Norris" in data:
         chuck_norris_joke()
